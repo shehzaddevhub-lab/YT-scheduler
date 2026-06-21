@@ -6,15 +6,11 @@
     <title>YT Schedule</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MQTT Websocket Library (For 100% Guaranteed Instant Live Sync) -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
-        /* Custom Scrollbar for hidden elements */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
-        /* Calendar Icon Color Fix */
         ::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
     </style>
 </head>
@@ -24,7 +20,7 @@
     <div id="idModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
             <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Connect to Sync ID</h3>
-            <p class="text-xs text-gray-400">Enter a shared ID or create a new one to sync your dashboard instantly on any device.</p>
+            <p class="text-xs text-gray-400">Enter a shared ID to sync your dashboard instantly on any device.</p>
             <input type="text" id="idCodeInput" placeholder="e.g., tech_master_2026" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white text-center focus:outline-none focus:border-red-500 transition font-mono font-bold">
             <button onclick="submitIdCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-xs font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Open Dashboard</button>
         </div>
@@ -97,7 +93,6 @@
                 <span id="pendingCount" class="text-[10px] bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/20 font-bold">0</span>
             </div>
             
-            <!-- Channel Filter Tabs -->
             <div class="flex bg-gray-950 rounded-xl p-1 mb-4 text-[10px] font-medium border border-gray-800">
                 <button onclick="setFilter('pending', 'All')" id="p-All" class="flex-1 py-1.5 rounded-lg bg-orange-600/20 text-orange-400 transition">All</button>
                 <button onclick="setFilter('pending', 'Tech IT Master')" id="p-Tech IT Master" class="flex-1 py-1.5 rounded-lg text-gray-500 hover:text-gray-300 transition">Tech IT</button>
@@ -116,7 +111,6 @@
                 <span id="clearCount" class="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full border border-green-500/20 font-bold">0</span>
             </div>
 
-            <!-- Channel Filter Tabs -->
             <div class="flex bg-gray-950 rounded-xl p-1 mb-4 text-[10px] font-medium border border-gray-800">
                 <button onclick="setFilter('cleared', 'All')" id="c-All" class="flex-1 py-1.5 rounded-lg bg-green-600/20 text-green-400 transition">All</button>
                 <button onclick="setFilter('cleared', 'Tech IT Master')" id="c-Tech IT Master" class="flex-1 py-1.5 rounded-lg text-gray-500 hover:text-gray-300 transition">Tech IT</button>
@@ -129,9 +123,9 @@
         </section>
     </main>
 
-    <!-- PWA & Sync Engine Script -->
+    <!-- PWA, Sync & Badge Engine Script -->
     <script>
-        // 1. PWA INSTALLER
+        // 1. PWA INSTALLER (YT SCHEDULE)
         const manifestStr = JSON.stringify({
             name: "YT Schedule", short_name: "YT Schedule", display: "standalone",
             background_color: "#030712", theme_color: "#dc2626",
@@ -140,6 +134,10 @@
         const blob = new Blob([manifestStr], {type: 'application/json'});
         document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(blob)}">`);
         
+        // Service Worker setup (Important for App Badges)
+        const swBlob = new Blob(["self.addEventListener('fetch', function() {});"], {type: 'application/javascript'});
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register(URL.createObjectURL(swBlob)); }
+
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); deferredPrompt = e;
@@ -156,51 +154,109 @@
 
         // 2. GLOBAL VARIABLES & STATE
         let activeIdCode = null;
-        let allVideosGlobal = JSON.parse(localStorage.getItem('yt_dash_local_backup')) || [];
+        let localDataStore = JSON.parse(localStorage.getItem('yt_schedule_db_v3')) || { timestamp: 0, videos: [] };
+        let allVideosGlobal = localDataStore.videos || [];
         
-        // Filter States
         let pendingFilter = 'All';
         let clearedFilter = 'All';
-
-        // Schedule Modal State
         let targetVideoIdForSchedule = null;
 
-        // 3. MQTT WEBSOCKET ENGINE (The 100% Guaranteed Sync)
-        // We use EMQX public broker which allows free, instantaneous messaging globally.
-        const mqttClient = mqtt.connect('wss://broker.emqx.io:8083/mqtt');
-
-        mqttClient.on('connect', () => {
-            if(activeIdCode) subscribeToRoom();
-        });
-
-        mqttClient.on('message', (topic, message) => {
-            if(topic === `yt_schedule_room_${activeIdCode}`) {
-                try {
-                    const incomingData = JSON.parse(message.toString());
-                    allVideosGlobal = incomingData;
-                    localStorage.setItem('yt_dash_local_backup', JSON.stringify(allVideosGlobal));
-                    renderVideos();
-                } catch(e) { console.log("Parse Error"); }
+        // 3. APP BADGING & NOTIFICATION ENGINE
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                Notification.requestPermission();
             }
-        });
-
-        function publishToCloud() {
-            if (activeIdCode && mqttClient.connected) {
-                // Retain: true means the server holds the last message for the next person who connects!
-                mqttClient.publish(`yt_schedule_room_${activeIdCode}`, JSON.stringify(allVideosGlobal), { retain: true });
-            }
-            // Always save locally immediately
-            localStorage.setItem('yt_dash_local_backup', JSON.stringify(allVideosGlobal));
         }
 
-        // 4. ID CONNECTION LOGIC
+        function updateAppIconBadge() {
+            // Pending ویڈیوز کی تعداد گننا
+            const allPendingCount = allVideosGlobal.filter(v => v.status === 'Pending' || v.status === 'SEO In Progress').length;
+            
+            // اگر براؤزر / موبائل App Badge API کو سپورٹ کرتا ہے
+            if ('setAppBadge' in navigator) {
+                if (allPendingCount > 0) {
+                    navigator.setAppBadge(allPendingCount).catch(err => console.log("Badge error", err));
+                } else {
+                    navigator.clearAppBadge().catch(err => console.log("Clear badge error", err));
+                }
+            }
+        }
+
+        function triggerNewVideoNotification(videoTitle) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification("YT Schedule", {
+                    body: `New Video Added: ${videoTitle}`,
+                    icon: "https://img.icons8.com/fluency/512/video-playlist.png"
+                });
+            }
+        }
+
+        // 4. HTTP POLLING ENGINE (100% UNBLOCKABLE SYNC)
+        async function pushToCloud() {
+            if(!activeIdCode) return;
+            
+            localDataStore.videos = allVideosGlobal;
+            localDataStore.timestamp = Date.now();
+            localStorage.setItem('yt_schedule_db_v3', JSON.stringify(localDataStore));
+            updateAppIconBadge(); // اپنا بیج بھی اپڈیٹ کریں
+
+            try {
+                await fetch(`https://dweet.io/dweet/for/yt_sched_room_${activeIdCode}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(localDataStore)
+                });
+            } catch (e) {
+                console.log("Cloud push delayed. Saved locally.");
+            }
+        }
+
+        async function pullFromCloud() {
+            if(!activeIdCode) return;
+
+            try {
+                const res = await fetch(`https://dweet.io/get/latest/dweet/for/yt_sched_room_${activeIdCode}`);
+                const json = await res.json();
+                
+                if (json && json.with && json.with.length > 0) {
+                    const cloudData = json.with[0].content;
+                    
+                    if (cloudData.timestamp > localDataStore.timestamp) {
+                        
+                        // نوٹیفکیشن چیکنگ: اگر کلاؤڈ میں ہماری لوکل ویڈیوز سے زیادہ ویڈیوز ہیں
+                        if(cloudData.videos && cloudData.videos.length > allVideosGlobal.length) {
+                            const newestVideo = cloudData.videos[0]; // سب سے اوپر والی نئی ویڈیو
+                            triggerNewVideoNotification(newestVideo.title);
+                        }
+
+                        localDataStore = cloudData;
+                        allVideosGlobal = cloudData.videos || [];
+                        localStorage.setItem('yt_schedule_db_v3', JSON.stringify(localDataStore));
+                        renderVideos();
+                        updateAppIconBadge(); // کلاؤڈ سے نیا ڈیٹا آنے پر بیج لیس/مائنس کریں
+                    } 
+                    else if (localDataStore.timestamp > cloudData.timestamp && allVideosGlobal.length > 0) {
+                        pushToCloud();
+                    }
+                }
+            } catch (e) {
+                // Background running silently
+            }
+        }
+
+        setInterval(pullFromCloud, 4000); // 4 سیکنڈ کی لوپ
+
+        // 5. ID CONNECTION LOGIC
         function checkUrlForId() {
             const params = new URLSearchParams(window.location.search);
             const idParam = params.get('id');
             
             if (idParam) {
                 activeIdCode = idParam.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                subscribeToRoom();
+                setupRoomUI();
+                requestNotificationPermission(); // آٹی ڈی لاگ ان ہوتے ہی پرمیشن مانگے گا
+                pullFromCloud();
+                updateAppIconBadge();
             } else {
                 document.getElementById('idModal').classList.remove('hidden');
                 renderVideos();
@@ -214,25 +270,21 @@
             activeIdCode = codeInput.toLowerCase().replace(/[^a-z0-9_-]/g, '');
             window.history.pushState({}, '', "?id=" + activeIdCode);
             document.getElementById('idModal').classList.add('hidden');
-            subscribeToRoom();
+            setupRoomUI();
+            
+            requestNotificationPermission();
+
+            if(allVideosGlobal.length > 0) pushToCloud();
+            else pullFromCloud();
         }
 
-        function subscribeToRoom() {
+        function setupRoomUI() {
             document.getElementById('syncBadge').className = "text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 flex items-center gap-1.5 font-medium";
             document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
             document.getElementById('syncText').innerText = "ID: " + activeIdCode;
-
-            if(mqttClient.connected) {
-                mqttClient.subscribe(`yt_schedule_room_${activeIdCode}`);
-                
-                // If we have local data, push it to cloud just in case the server is empty
-                setTimeout(() => {
-                    if(allVideosGlobal.length > 0) publishToCloud();
-                }, 1500);
-            }
         }
 
-        // 5. YOUTUBE EXTRACTOR
+        // 6. YOUTUBE EXTRACTOR
         function getYouTubeId(url) {
             if (!url) return null;
             let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
@@ -251,7 +303,7 @@
             }
         }
 
-        // 6. FILTER & RENDER ENGINE
+        // 7. FILTER & RENDER ENGINE
         function setFilter(section, channelName) {
             if(section === 'pending') {
                 pendingFilter = channelName;
@@ -276,29 +328,24 @@
         }
 
         function renderVideos() {
-            // Base Categorization
             const allPending = allVideosGlobal.filter(v => v.status === 'Pending' || v.status === 'SEO In Progress');
             const allCleared = allVideosGlobal.filter(v => v.status === 'Scheduled' || v.status === 'Public');
 
-            // Apply Channel Filters
             const filteredPending = pendingFilter === 'All' ? allPending : allPending.filter(v => v.channel === pendingFilter);
             const filteredCleared = clearedFilter === 'All' ? allCleared : allCleared.filter(v => v.channel === clearedFilter);
 
-            // Update Counts (Showing filtered count / total count)
             document.getElementById('pendingCount').innerText = `${filteredPending.length} / ${allPending.length}`;
             document.getElementById('clearCount').innerText = `${filteredCleared.length} / ${allCleared.length}`;
 
             const pendingList = document.getElementById('pendingList');
             const clearList = document.getElementById('clearList');
 
-            // Render Pending
             if (filteredPending.length === 0) {
                 pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos found.</div>`;
             } else {
                 pendingList.innerHTML = filteredPending.map(video => createCardHTML(video)).join('');
             }
 
-            // Render Cleared
             if (filteredCleared.length === 0) {
                 clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos found.</div>`;
             } else {
@@ -315,12 +362,10 @@
                           video.status === 'SEO In Progress' ? 'Set Schedule' : 
                           video.status === 'Scheduled' ? 'Mark Public' : 'Back to Pending';
 
-            // Button Action - If "SEO In Progress", it opens Modal instead of prompt!
             let actionClick = video.status === 'SEO In Progress' ? `openScheduleModal('${video.id}')` : `updateStatus('${video.id}', '${video.status}')`;
 
             const channelClass = video.channel === 'Tech IT Master' ? 'bg-orange-600/20 text-orange-400' : 'bg-blue-600/20 text-blue-400';
             
-            // Format time display beautifully
             let displayTimeHTML = '';
             if(video.schedule_time) {
                 const dateObj = new Date(video.schedule_time);
@@ -357,10 +402,10 @@
             `;
         }
 
-        // 7. CORE ACTIONS (FORM SUBMIT)
+        // 8. CORE ACTIONS (FORM SUBMIT)
         function handleFormSubmit(event) {
             event.preventDefault();
-            if(!activeIdCode) return alert("Please enter an ID first to enable saving!");
+            if(!activeIdCode) return alert("Please enter an ID first!");
 
             const title = document.getElementById('videoTitle').value.trim();
             const channel = document.getElementById('videoChannel').value;
@@ -370,27 +415,22 @@
 
             const newVideoObj = { id: 'vid_' + Date.now(), title, channel, link, status: 'Pending', schedule_time: '' };
 
-            // Instantly add to array and render
             allVideosGlobal.unshift(newVideoObj);
             renderVideos();
-            publishToCloud(); // Sync to Latif bhai instantly
+            pushToCloud(); 
 
-            // Clear form
             document.getElementById('videoForm').reset();
             const previewBox = document.getElementById('formVideoPreview');
             previewBox.classList.add('hidden');
             previewBox.innerHTML = '';
         }
 
-        // 8. DATE & TIME MODAL LOGIC
+        // 9. DATE & TIME MODAL LOGIC
         function openScheduleModal(id) {
             targetVideoIdForSchedule = id;
-            
-            // Set today's date and current time as default
             const now = new Date();
             document.getElementById('scheduleDate').value = now.toISOString().split('T')[0];
             document.getElementById('scheduleTime').value = now.toTimeString().slice(0,5);
-            
             document.getElementById('scheduleModal').classList.remove('hidden');
         }
 
@@ -405,7 +445,6 @@
             
             if(!dateVal || !timeVal) return alert("Please select both Date and Time!");
 
-            // Combine into a standard ISO format string
             const combinedDateTime = `${dateVal}T${timeVal}`;
 
             allVideosGlobal = allVideosGlobal.map(v => {
@@ -418,10 +457,9 @@
 
             closeScheduleModal();
             renderVideos();
-            publishToCloud();
+            pushToCloud();
         }
 
-        // Standard Status Update (For other buttons)
         function updateStatus(id, currentStatus) {
             let nextStatus = 'Pending';
             if (currentStatus === 'Pending') nextStatus = 'SEO In Progress';
@@ -436,7 +474,7 @@
                 return v;
             });
             renderVideos();
-            publishToCloud();
+            pushToCloud();
         }
 
         function showDeletePrompt(id) {
@@ -448,7 +486,7 @@
             if(confirm) {
                 allVideosGlobal = allVideosGlobal.filter(v => v.id !== id);
                 renderVideos();
-                publishToCloud();
+                pushToCloud();
             } else {
                 document.getElementById(`del-btn-${id}`).classList.remove('hidden');
                 document.getElementById(`del-box-${id}`).classList.add('hidden');
