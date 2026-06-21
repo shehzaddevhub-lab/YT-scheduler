@@ -6,7 +6,7 @@
     <title>Video Dash</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase Libraries (Universal Shared Engine) -->
+    <!-- Firebase Libraries -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
@@ -16,22 +16,22 @@
 </head>
 <body class="min-h-screen bg-gray-950 text-gray-100 p-3 md:p-6 select-none">
 
-    <!-- SETUP / ROOM ENTRY MODAL (اگر یو آر ایل میں کوڈ نہ ہو تو یہ سامنے آئے گا) -->
-    <div id="roomModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <!-- SETUP / ID ENTRY MODAL (اگر یو آر ایل میں آئی ڈی نہ ہو تو یہ سامنے آئے گا) -->
+    <div id="idModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
-            <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Connect to Sync Room</h3>
-            <p class="text-xs text-gray-400">Enter a shared room code or create a new one to sync your dashboard instantly on any device.</p>
-            <input type="text" id="roomCodeInput" placeholder="e.g., tech_master_2026" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white text-center focus:outline-none focus:border-red-500 transition font-mono font-bold">
-            <button onclick="submitRoomCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-xs font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Open Dashboard</button>
+            <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Connect to Sync ID</h3>
+            <p class="text-xs text-gray-400">Enter a shared ID or create a new one to sync your dashboard instantly on any device.</p>
+            <input type="text" id="idCodeInput" placeholder="e.g., tech_master_2026" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white text-center focus:outline-none focus:border-red-500 transition font-mono font-bold">
+            <button onclick="submitIdCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-xs font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Open Dashboard</button>
         </div>
     </div>
 
     <!-- Header Section -->
     <header class="max-w-7xl mx-auto flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
         
-        <!-- LEFT TOP: INSTALL APP BUTTON -->
+        <!-- LEFT TOP: INSTALL APP BUTTON (Forced to show for testing) -->
         <div class="flex items-center gap-2">
-            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition">
+            <button id="installAppBtn" class="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
                 <span>📱</span> Install App
             </button>
             <button id="iosInstallInfo" onclick="alert('iPhone Users: Tap Share icon in Safari -> Add to Home Screen')" class="hidden flex items-center gap-1.5 bg-gray-800 border border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium text-gray-300">
@@ -39,11 +39,11 @@
             </button>
         </div>
         
-        <!-- TOP RIGHT: ACTIVE ROOM BADGE -->
+        <!-- TOP RIGHT: ACTIVE ID BADGE -->
         <div>
             <span id="syncBadge" class="text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 flex items-center gap-1.5 font-medium">
                 <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span> 
-                <span id="syncText">No Active Room</span>
+                <span id="syncText">No Active ID</span>
             </span>
         </div>
     </header>
@@ -65,7 +65,7 @@
                     </select>
                     <input type="url" id="videoLink" placeholder="YouTube Video Link..." class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500 transition" oninput="previewVideo(this.value)" required />
                     <div id="formVideoPreview" class="hidden w-full aspect-video rounded-xl overflow-hidden bg-black border border-gray-800"></div>
-                    <button type="submit" id="submitBtn" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold p-3 text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95">Add to Schedule</button>
+                    <button type="submit" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold p-3 text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95">Add to Schedule</button>
                 </form>
             </section>
         </div>
@@ -77,7 +77,7 @@
                 <span id="pendingCount" class="text-xs bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/20">0</span>
             </h2>
             <div id="pendingList" class="space-y-4">
-                <div class="text-center py-12 text-gray-600 text-xs">Waiting for active room connection...</div>
+                <div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos.</div>
             </div>
         </section>
 
@@ -88,7 +88,7 @@
                 <span id="clearCount" class="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full border border-green-500/20">0</span>
             </h2>
             <div id="clearList" class="space-y-4">
-                <div class="text-center py-12 text-gray-600 text-xs">No entries.</div>
+                <div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos.</div>
             </div>
         </section>
     </main>
@@ -113,74 +113,71 @@
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); deferredPrompt = e;
-            document.getElementById('installAppBtn').classList.remove('hidden');
         });
+        
         document.getElementById('installAppBtn').addEventListener('click', async () => {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
                 const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') document.getElementById('installAppBtn').classList.add('hidden');
                 deferredPrompt = null;
+            } else {
+                alert("To install this App manually:\nAndroid: Tap the 3 dots in Chrome -> Install App.\niPhone: Tap Share in Safari -> Add to Home Screen.");
             }
         });
 
         const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-        const isInStandaloneMode = () => ('standalone' in window.navigator) && window.navigator.standalone;
-        if (isIos() && !isInStandaloneMode()) { document.getElementById('iosInstallInfo').classList.remove('hidden'); }
+        if (isIos()) { document.getElementById('iosInstallInfo').classList.remove('hidden'); }
 
-        // 2. UNIVERSAL FIREBASE LOGIC (NO AUTH / NO ACCOUNT REQUIRED)
+        // 2. UNIVERSAL FIREBASE LOGIC (NO AUTH REQUIRED)
         const firebaseConfig = { databaseURL: "https://tech-master-live-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         
-        let activeRoomId = null;
+        let activeIdCode = null;
         let dbSyncRef = null;
         let allVideosGlobal = [];
 
         const pendingList = document.getElementById('pendingList');
         const clearList = document.getElementById('clearList');
         const formVideoPreview = document.getElementById('formVideoPreview');
-        const submitBtn = document.getElementById('submitBtn');
 
-        // یو آر ایل سے روم کوڈ ریڈ کرنا (تاکہ ڈائریکٹ انکلوگنیٹو میں بھی سنک اوپن ہو)
-        function checkUrlForRoom() {
+        // یو آر ایل سے آئی ڈی ریڈ کرنا
+        function checkUrlForId() {
             const params = new URLSearchParams(window.location.search);
-            const roomParam = params.get('room');
+            const idParam = params.get('id');
             
-            if (roomParam) {
-                activeRoomId = roomParam.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                connectToRoom();
+            if (idParam) {
+                activeIdCode = idParam.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                connectToId();
             } else {
-                // اگر یو آر ایل خالی ہے تو روم کوڈ درج کرنے کا پاپ اپ دکھائیں
-                document.getElementById('roomModal').classList.remove('hidden');
+                document.getElementById('idModal').classList.remove('hidden');
             }
         }
 
-        function submitRoomCode() {
-            const codeInput = document.getElementById('roomCodeInput').value.trim();
-            if (!codeInput) return alert("Please enter a valid code!");
+        function submitIdCode() {
+            const codeInput = document.getElementById('idCodeInput').value.trim();
+            if (!codeInput) return alert("Please enter a valid ID!");
             
-            activeRoomId = codeInput.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            activeIdCode = codeInput.toLowerCase().replace(/[^a-z0-9_-]/g, '');
             
-            // یو آر ایل بار میں کوڈ فکس کر دیں تاکہ لنک مستقل بن جائے
-            const newUrl = window.location.origin + window.location.pathname + "?room=" + activeRoomId;
+            const newUrl = window.location.origin + window.location.pathname + "?id=" + activeIdCode;
             window.history.pushState({}, '', newUrl);
             
-            document.getElementById('roomModal').classList.add('hidden');
-            connectToRoom();
+            document.getElementById('idModal').classList.add('hidden');
+            connectToId();
         }
 
-        // فائر بیس کلاؤڈ روم سے لائیو کنیکٹ ہونا
-        function connectToRoom() {
-            if (!activeRoomId) return;
+        // کلاؤڈ آئی ڈی کمرے سے لائیو کنیکٹ ہونا
+        function connectToId() {
+            if (!activeIdCode) return;
             
             document.getElementById('syncBadge').className = "text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 flex items-center gap-1.5 font-medium";
             document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
-            document.getElementById('syncText').innerText = "Room: " + activeRoomId;
+            document.getElementById('syncText').innerText = "ID: " + activeIdCode;
 
             if (dbSyncRef) dbSyncRef.off();
             
-            dbSyncRef = database.ref('universal_rooms/' + activeRoomId);
+            dbSyncRef = database.ref('universal_rooms/' + activeIdCode);
             dbSyncRef.on('value', (snapshot) => {
                 const data = snapshot.val();
                 let videosArray = [];
@@ -189,7 +186,7 @@
                         videosArray.push({ id: key, ...data[key] });
                     });
                 }
-                videosArray.reverse(); // New entries first
+                videosArray.reverse();
                 allVideosGlobal = videosArray;
                 renderVideos();
             });
@@ -225,13 +222,13 @@
             document.getElementById('clearCount').innerText = clearVideos.length;
 
             if (pendingVideos.length === 0) {
-                pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending tasks. Everything clear! 👍</div>`;
+                pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos.</div>`;
             } else {
                 pendingList.innerHTML = pendingVideos.map(video => createCardHTML(video)).join('');
             }
 
             if (clearVideos.length === 0) {
-                clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared schedules yet.</div>`;
+                clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos.</div>`;
             } else {
                 clearList.innerHTML = clearVideos.map(video => createCardHTML(video)).join('');
             }
@@ -262,7 +259,6 @@
                     ${embedHTML}
                     
                     <div class="flex items-center justify-between border-t border-gray-800 pt-2 mt-2">
-                        <!-- Yes/No Inner Delete Box -->
                         <div id="del-box-${video.id}" class="hidden flex items-center gap-1.5">
                             <span class="text-[10px] text-gray-400">Delete?</span>
                             <button onclick="confirmDelete('${video.id}', true)" class="px-2 py-1 bg-red-600 text-[10px] text-white rounded cursor-pointer">Yes</button>
@@ -278,10 +274,10 @@
             `;
         }
 
-        // 4. CORE ACTIONS
+        // 4. CORE ACTIONS (ADD TO SCHEDULE FIXED)
         document.getElementById('videoForm').addEventListener('submit', (e) => {
             e.preventDefault();
-            if(!activeRoomId) return alert("Please connect to a room first!");
+            if(!activeIdCode || !dbSyncRef) return alert("Please connect to an ID first!");
 
             const title = document.getElementById('videoTitle').value.trim();
             const channel = document.getElementById('videoChannel').value;
@@ -292,11 +288,13 @@
                 document.getElementById('videoForm').reset();
                 formVideoPreview.classList.add('hidden');
                 formVideoPreview.innerHTML = '';
+            }).catch(err => {
+                alert("Database sync error!");
             });
         });
 
         function updateStatus(id, currentStatus) {
-            if(!activeRoomId) return;
+            if(!activeIdCode) return;
             let nextStatus = 'Pending';
             let timePrompt = null;
 
@@ -322,7 +320,7 @@
         }
 
         function confirmDelete(id, confirm) {
-            if(confirm && activeRoomId) {
+            if(confirm && activeIdCode) {
                 dbSyncRef.child(id).remove();
             } else {
                 document.getElementById(`del-btn-${id}`).classList.remove('hidden');
@@ -331,7 +329,7 @@
         }
 
         // رن انجن
-        checkUrlForRoom();
+        checkUrlForId();
     </script>
 </body>
 </html>
