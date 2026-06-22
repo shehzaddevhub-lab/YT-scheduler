@@ -64,30 +64,15 @@
 
     <header class="max-w-7xl mx-auto flex justify-between items-center border-b border-gray-800 pb-4 mb-6 relative z-40">
         
-        <div class="flex items-center">
-            <button onclick="toggleTheme()" id="themeToggleBtn" class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-base shadow-md transition cursor-pointer">
-                ☀️
-            </button>
-        </div>
-        
-        <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center">
-            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
-                <span>📱</span> Install App
-            </button>
-        </div>
-
         <div class="flex items-center gap-2 md:gap-3">
-            <span id="syncBadge" class="hidden sm:flex text-[10px] md:text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 items-center gap-1.5 font-medium">
-                <span id="syncText">Connecting...</span>
-            </span>
             <div class="relative">
                 <button onclick="toggleProfileMenu()" class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium cursor-pointer transition shadow-md">
-                    <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span>
-                    <span id="profileBtnText" class="truncate max-w-[70px]">Menu</span>
                     <span class="text-lg">👤</span>
+                    <span id="profileBtnText" class="truncate max-w-[70px]">Menu</span>
+                    <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span>
                 </button>
                 
-                <div id="profileMenu" class="hidden absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
+                <div id="profileMenu" class="hidden absolute left-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
                     <div class="border-b border-gray-800 pb-3">
                         <p class="text-[10px] text-gray-500">Active Sync ID:</p>
                         <p id="dispProfileId" class="text-sm text-green-400 font-mono font-bold truncate">Not Logged In</p>
@@ -100,6 +85,22 @@
                     </button>
                 </div>
             </div>
+
+            <span id="syncBadge" class="hidden sm:flex text-[10px] md:text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 items-center gap-1.5 font-medium">
+                <span id="syncText">Connecting...</span>
+            </span>
+        </div>
+        
+        <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
+                <span>📱</span> Install App
+            </button>
+        </div>
+
+        <div class="flex items-center">
+            <button onclick="toggleTheme()" id="themeToggleBtn" class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-base shadow-md transition cursor-pointer">
+                ☀️
+            </button>
         </div>
 
     </header>
@@ -205,16 +206,16 @@
         // 3. GLOBAL VARIABLES
         const myDeviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
         let activeIdCode = localStorage.getItem('yt_active_id') || null;
-        let allVideosGlobal = JSON.parse(localStorage.getItem(`yt_backup_${activeIdCode}`)) || [];
-        let lastCloudTimestamp = 0;
+        let localDataStore = JSON.parse(localStorage.getItem('yt_schedule_db_v4')) || { timestamp: 0, videos: [] };
+        let allVideosGlobal = localDataStore.videos || [];
+        let lastCloudTimestamp = localDataStore.timestamp || 0;
         let isFirstLoad = true;
         
         let pendingFilter = 'All';
         let clearedFilter = 'All';
         let targetVideoIdForSchedule = null;
 
-        // 4. HTTP POLLING ENGINE (THE 100% UNBLOCKABLE METHOD)
-        // Dweet.io acts as our reliable relay server. It doesn't block CORS and works on all Pakistani Telcos.
+        // 4. HTTP POLLING ENGINE (100% FIXED & UNBLOCKABLE)
         async function pushToCloud() {
             if(!activeIdCode) return;
             
@@ -223,6 +224,11 @@
                 sender: myDeviceId,
                 ts: Date.now()
             };
+
+            localDataStore.videos = allVideosGlobal;
+            localDataStore.timestamp = payload.ts;
+            localStorage.setItem('yt_schedule_db_v4', JSON.stringify(localDataStore));
+            updateAppBadge();
 
             try {
                 await fetch(`https://dweet.io/dweet/for/yt_master_sync_${activeIdCode}`, {
@@ -240,27 +246,32 @@
             if(!activeIdCode) return;
 
             try {
-                // Fetching with cache-busting to ensure real-time fresh data
                 const res = await fetch(`https://dweet.io/get/latest/dweet/for/yt_master_sync_${activeIdCode}?t=${Date.now()}`, { cache: "no-store" });
                 const json = await res.json();
                 
+                // یوزر کا بگ یہیں تھا، json.with ایک ایرا (Array) ہے، اسے کے ساتھ پکڑنا ہے
                 if(json && json.with && json.with.length > 0) {
                     const cloudData = json.with.content;
                     
-                    // If the cloud has newer data AND it wasn't sent by me
-                    if(cloudData.ts > lastCloudTimestamp && cloudData.sender !== myDeviceId) {
+                    if(cloudData && cloudData.ts > lastCloudTimestamp && cloudData.sender !== myDeviceId) {
                         
-                        if(cloudData.videos.length > allVideosGlobal.length && !isFirstLoad) {
+                        if(cloudData.videos && cloudData.videos.length > allVideosGlobal.length && !isFirstLoad) {
                             triggerNotification(cloudData.videos.title);
                         }
                         
-                        allVideosGlobal = cloudData.videos;
+                        allVideosGlobal = cloudData.videos || [];
                         lastCloudTimestamp = cloudData.ts;
-                        saveLocallyAndRender();
+                        
+                        localDataStore.videos = allVideosGlobal;
+                        localDataStore.timestamp = lastCloudTimestamp;
+                        localStorage.setItem('yt_schedule_db_v4', JSON.stringify(localDataStore));
+                        
+                        updateAppBadge();
+                        renderVideos();
                     }
                 }
                 
-                // Show connected state
+                // Connection Active Status
                 document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
                 document.getElementById('syncBadge').className = "hidden sm:flex text-[10px] md:text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 items-center gap-1.5 font-medium";
                 document.getElementById('syncText').innerText = "Live";
@@ -272,10 +283,10 @@
             }
         }
 
-        // Poll the server every 3 seconds
+        // Poll every 3 seconds
         setInterval(pullFromCloud, 3000);
 
-        // 5. NOTIFICATION & BADGES
+        // 5. NOTIFICATIONS & BADGES
         function enableNotifications() {
             if ('Notification' in window) {
                 Notification.requestPermission().then(perm => {
@@ -303,13 +314,7 @@
             }
         }
 
-        function saveLocallyAndRender() {
-            if(activeIdCode) localStorage.setItem(`yt_backup_${activeIdCode}`, JSON.stringify(allVideosGlobal));
-            updateAppBadge();
-            renderVideos();
-        }
-
-        // 6. LOGIN / LOGOUT LOGIC
+        // 6. LOGIN / LOGOUT
         function toggleProfileMenu() {
             document.getElementById('profileMenu').classList.toggle('hidden');
         }
@@ -352,20 +357,21 @@
         function setupApp() {
             document.getElementById('profileBtnText').innerText = activeIdCode;
             document.getElementById('dispProfileId').innerText = activeIdCode;
-            allVideosGlobal = JSON.parse(localStorage.getItem(`yt_backup_${activeIdCode}`)) || [];
             
             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
                 Notification.requestPermission();
             }
             
-            saveLocallyAndRender();
-            pullFromCloud(); // Initial Pull
+            updateAppBadge();
+            renderVideos();
+            pullFromCloud(); // Force first pull
         }
 
-        // 7. YOUTUBE EXTRACTOR & EMBED
+        // 7. YOUTUBE EXTRACTOR (ADVANCED REGEX)
         function getYouTubeId(url) {
             if (!url) return null;
-            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/gi;
+            // یہ فارمولا پرائیویٹ، شارٹس، ایمبیڈ سب میں سے آئی ڈی نکال لے گا
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([^"&?\/\s]{11})/gi;
             const match = regex.exec(url);
             return match ? match : null;
         }
@@ -386,7 +392,31 @@
             }
         }
 
-        // 8. FILTER & RENDER ENGINE
+        // 8. FORM SUBMIT & RENDER
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            if(!activeIdCode) return alert("Please connect an ID first!");
+
+            const title = document.getElementById('videoTitle').value.trim();
+            const channel = document.getElementById('videoChannel').value;
+            const link = document.getElementById('videoLink').value.trim();
+            
+            const vidId = getYouTubeId(link);
+            if (!vidId) return alert("Invalid YouTube Link!");
+
+            const newVideoObj = { id: 'vid_' + Date.now(), title, channel, link, status: 'Pending', schedule_time: '' };
+
+            allVideosGlobal.unshift(newVideoObj);
+            
+            renderVideos(); // فوری اسکرین پر لائیں
+            pushToCloud();  // کلاؤڈ پر دھکیلیں
+
+            event.target.reset();
+            const previewBox = document.getElementById('formVideoPreview');
+            previewBox.classList.add('hidden');
+            previewBox.innerHTML = '';
+        }
+
         function setFilter(section, channelName) {
             if(section === 'pending') {
                 pendingFilter = channelName;
@@ -485,31 +515,7 @@
             `;
         }
 
-        // 9. FORM SUBMISSION
-        function handleFormSubmit(event) {
-            event.preventDefault();
-            if(!activeIdCode) return alert("Please Login with an ID first!");
-
-            const title = document.getElementById('videoTitle').value.trim();
-            const channel = document.getElementById('videoChannel').value;
-            const link = document.getElementById('videoLink').value.trim();
-            
-            const vidId = getYouTubeId(link);
-            if (!vidId) return alert("Invalid YouTube Link!");
-
-            const newVideoObj = { id: 'vid_' + Date.now(), title, channel, link, status: 'Pending', schedule_time: '' };
-
-            allVideosGlobal.unshift(newVideoObj);
-            saveLocallyAndRender();
-            pushToCloud();
-
-            event.target.reset();
-            const previewBox = document.getElementById('formVideoPreview');
-            previewBox.classList.add('hidden');
-            previewBox.innerHTML = '';
-        }
-
-        // 10. UPDATE & DELETE
+        // 9. STATUS & DELETE ACTIONS
         function openScheduleModal(id) {
             targetVideoIdForSchedule = id;
             const now = new Date();
@@ -540,7 +546,7 @@
             });
 
             closeScheduleModal();
-            saveLocallyAndRender();
+            renderVideos();
             pushToCloud();
         }
 
@@ -557,7 +563,7 @@
                 }
                 return v;
             });
-            saveLocallyAndRender();
+            renderVideos();
             pushToCloud();
         }
 
@@ -569,7 +575,7 @@
         function confirmDelete(id, confirm) {
             if(confirm) {
                 allVideosGlobal = allVideosGlobal.filter(v => v.id !== id);
-                saveLocallyAndRender();
+                renderVideos();
                 pushToCloud();
             } else {
                 document.getElementById(`del-btn-${id}`).classList.remove('hidden');
