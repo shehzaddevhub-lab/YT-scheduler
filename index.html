@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>YT Schedule</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Live MQTT WebSockets (No Database Required, 100% Instant Sync) -->
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s, color 0.3s; }
@@ -33,7 +30,6 @@
 </head>
 <body class="min-h-screen bg-gray-950 text-gray-100 p-3 md:p-6 select-none relative">
 
-    <!-- 1. ID ENTRY MODAL -->
     <div id="idModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
             <div class="flex justify-center mb-2">
@@ -46,7 +42,6 @@
         </div>
     </div>
 
-    <!-- 2. DATE & TIME PICKER MODAL -->
     <div id="scheduleModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full space-y-5 shadow-2xl">
             <h3 class="text-lg font-bold text-teal-400 flex items-center gap-2"><span>📅</span> Set Schedule</h3>
@@ -67,11 +62,24 @@
         </div>
     </div>
 
-    <!-- 3. MAIN HEADER SECTION -->
     <header class="max-w-7xl mx-auto flex justify-between items-center border-b border-gray-800 pb-4 mb-6 relative z-40">
         
-        <!-- LEFT: PROFILE MENU & CONNECTION STATUS -->
+        <div class="flex items-center">
+            <button onclick="toggleTheme()" id="themeToggleBtn" class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-base shadow-md transition cursor-pointer">
+                ☀️
+            </button>
+        </div>
+        
+        <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
+                <span>📱</span> Install App
+            </button>
+        </div>
+
         <div class="flex items-center gap-2 md:gap-3">
+            <span id="syncBadge" class="hidden sm:flex text-[10px] md:text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 items-center gap-1.5 font-medium">
+                <span id="syncText">Connecting...</span>
+            </span>
             <div class="relative">
                 <button onclick="toggleProfileMenu()" class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium cursor-pointer transition shadow-md">
                     <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span>
@@ -79,7 +87,7 @@
                     <span class="text-lg">👤</span>
                 </button>
                 
-                <div id="profileMenu" class="hidden absolute left-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
+                <div id="profileMenu" class="hidden absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
                     <div class="border-b border-gray-800 pb-3">
                         <p class="text-[10px] text-gray-500">Active Sync ID:</p>
                         <p id="dispProfileId" class="text-sm text-green-400 font-mono font-bold truncate">Not Logged In</p>
@@ -92,42 +100,17 @@
                     </button>
                 </div>
             </div>
-
-            <!-- Sync Status Badge (Hidden on very small screens to save space) -->
-            <span id="syncBadge" class="hidden sm:flex text-[10px] md:text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 items-center gap-1.5 font-medium">
-                <span id="syncText">Connecting...</span>
-            </span>
-        </div>
-        
-        <!-- CENTER: INSTALL APP BUTTON -->
-        <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center">
-            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
-                <span>📱</span> Install App
-            </button>
-            <button id="iosInstallInfo" onclick="alert('iPhone: Tap Share icon in Safari -> Add to Home Screen')" class="hidden flex items-center gap-1.5 bg-gray-800 border border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium text-gray-300 cursor-pointer">
-                <span>🍏</span> iOS Install
-            </button>
-        </div>
-
-        <!-- RIGHT: DARK / LIGHT MODE SWITCH -->
-        <div class="flex items-center">
-            <button onclick="toggleTheme()" id="themeToggleBtn" class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-base shadow-md transition cursor-pointer">
-                ☀️
-            </button>
         </div>
 
     </header>
 
-    <!-- Main 3-Section Layout Grid -->
     <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 items-start relative z-10">
         
-        <!-- SECTION 1: VIDEO ADD -->
         <div class="space-y-6">
             <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl">
                 <h2 class="text-base font-bold mb-4 text-yellow-400 flex items-center gap-2 border-b border-gray-800 pb-2">
                     <span>🎬</span> Add New Video
                 </h2>
-                <!-- Form Submission Fixed completely -->
                 <form id="videoForm" class="space-y-4" onsubmit="handleFormSubmit(event)">
                     <input type="text" id="videoTitle" placeholder="Video Title..." class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500 transition" required />
                     <select id="videoChannel" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none cursor-pointer">
@@ -143,7 +126,6 @@
             </section>
         </div>
 
-        <!-- SECTION 2: PENDING -->
         <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl lg:min-h-[500px] flex flex-col">
             <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                 <h2 class="text-base font-bold text-orange-400 flex items-center gap-2"><span>⏳</span> Pending</h2>
@@ -161,7 +143,6 @@
             </div>
         </section>
 
-        <!-- SECTION 3: CLEARED -->
         <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl lg:min-h-[500px] flex flex-col">
             <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                 <h2 class="text-base font-bold text-green-400 flex items-center gap-2"><span>✅</span> Cleared</h2>
@@ -180,9 +161,8 @@
         </section>
     </main>
 
-    <!-- Core App Engine -->
     <script>
-        // 1. THEME TOGGLE LOGIC (DARK / LIGHT MODE)
+        // 1. THEME TOGGLE LOGIC
         function toggleTheme() {
             const body = document.body;
             body.classList.toggle('light-theme');
@@ -191,13 +171,12 @@
             document.getElementById('themeToggleBtn').innerHTML = isLight ? '🌙' : '☀️';
         }
         
-        // Load saved theme on startup
         if (localStorage.getItem('yt_theme') === 'light') {
             document.body.classList.add('light-theme');
             document.getElementById('themeToggleBtn').innerHTML = '🌙';
         }
 
-        // 2. PWA & INSTALLER
+        // 2. PWA INSTALLER
         const manifestStr = JSON.stringify({
             name: "YT Schedule", short_name: "YT Schedule", display: "standalone",
             background_color: "#030712", theme_color: "#dc2626",
@@ -223,60 +202,84 @@
             }
         });
 
-        const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
-        const isInStandaloneMode = () => ('standalone' in window.navigator) && window.navigator.standalone;
-        if (isIos() && !isInStandaloneMode()) { document.getElementById('iosInstallInfo').classList.remove('hidden'); }
-
         // 3. GLOBAL VARIABLES
         const myDeviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
         let activeIdCode = localStorage.getItem('yt_active_id') || null;
         let allVideosGlobal = JSON.parse(localStorage.getItem(`yt_backup_${activeIdCode}`)) || [];
+        let lastCloudTimestamp = 0;
+        let isFirstLoad = true;
         
         let pendingFilter = 'All';
         let clearedFilter = 'All';
         let targetVideoIdForSchedule = null;
 
-        // 4. MQTT WEBSOCKETS (100% UNBLOCKABLE LIVE SYNC)
-        const mqttClient = mqtt.connect('wss://broker.hivemq.com:8443/mqtt');
+        // 4. HTTP POLLING ENGINE (THE 100% UNBLOCKABLE METHOD)
+        // Dweet.io acts as our reliable relay server. It doesn't block CORS and works on all Pakistani Telcos.
+        async function pushToCloud() {
+            if(!activeIdCode) return;
+            
+            const payload = {
+                videos: allVideosGlobal,
+                sender: myDeviceId,
+                ts: Date.now()
+            };
 
-        mqttClient.on('connect', () => {
-            if(activeIdCode) {
+            try {
+                await fetch(`https://dweet.io/dweet/for/yt_master_sync_${activeIdCode}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                lastCloudTimestamp = payload.ts;
+            } catch(e) { 
+                console.log("Cloud push delayed, local saved."); 
+            }
+        }
+
+        async function pullFromCloud() {
+            if(!activeIdCode) return;
+
+            try {
+                // Fetching with cache-busting to ensure real-time fresh data
+                const res = await fetch(`https://dweet.io/get/latest/dweet/for/yt_master_sync_${activeIdCode}?t=${Date.now()}`, { cache: "no-store" });
+                const json = await res.json();
+                
+                if(json && json.with && json.with.length > 0) {
+                    const cloudData = json.with.content;
+                    
+                    // If the cloud has newer data AND it wasn't sent by me
+                    if(cloudData.ts > lastCloudTimestamp && cloudData.sender !== myDeviceId) {
+                        
+                        if(cloudData.videos.length > allVideosGlobal.length && !isFirstLoad) {
+                            triggerNotification(cloudData.videos.title);
+                        }
+                        
+                        allVideosGlobal = cloudData.videos;
+                        lastCloudTimestamp = cloudData.ts;
+                        saveLocallyAndRender();
+                    }
+                }
+                
+                // Show connected state
                 document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
                 document.getElementById('syncBadge').className = "hidden sm:flex text-[10px] md:text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 items-center gap-1.5 font-medium";
                 document.getElementById('syncText').innerText = "Live";
-                mqttClient.subscribe(`yt_pro_sync_${activeIdCode}`);
+                isFirstLoad = false;
+                
+            } catch(e) {
+                document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-yellow-400";
+                document.getElementById('syncText').innerText = "Reconnecting...";
             }
-        });
-
-        mqttClient.on('message', (topic, message) => {
-            if(topic === `yt_pro_sync_${activeIdCode}`) {
-                try {
-                    const payload = JSON.parse(message.toString());
-                    if(payload.sender !== myDeviceId) {
-                        if(payload.videos.length > allVideosGlobal.length) {
-                            const newVideo = payload.videos[0];
-                            triggerNotification(newVideo.title);
-                        }
-                        allVideosGlobal = payload.videos;
-                        saveAndRender();
-                    }
-                } catch(e) { console.error(e); }
-            }
-        });
-
-        function publishData() {
-            if(activeIdCode && mqttClient.connected) {
-                const payload = JSON.stringify({ sender: myDeviceId, videos: allVideosGlobal });
-                mqttClient.publish(`yt_pro_sync_${activeIdCode}`, payload, { retain: true });
-            }
-            saveAndRender();
         }
+
+        // Poll the server every 3 seconds
+        setInterval(pullFromCloud, 3000);
 
         // 5. NOTIFICATION & BADGES
         function enableNotifications() {
             if ('Notification' in window) {
                 Notification.requestPermission().then(perm => {
-                    if(perm === 'granted') alert("Notifications Enabled successfully!");
+                    if(perm === 'granted') alert("Alerts Enabled successfully!");
                     else alert("Please allow notifications in your browser permissions.");
                 });
             }
@@ -300,10 +303,8 @@
             }
         }
 
-        function saveAndRender() {
-            if(activeIdCode) {
-                localStorage.setItem(`yt_backup_${activeIdCode}`, JSON.stringify(allVideosGlobal));
-            }
+        function saveLocallyAndRender() {
+            if(activeIdCode) localStorage.setItem(`yt_backup_${activeIdCode}`, JSON.stringify(allVideosGlobal));
             updateAppBadge();
             renderVideos();
         }
@@ -353,26 +354,20 @@
             document.getElementById('dispProfileId').innerText = activeIdCode;
             allVideosGlobal = JSON.parse(localStorage.getItem(`yt_backup_${activeIdCode}`)) || [];
             
-            if(mqttClient.connected) {
-                document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
-                document.getElementById('syncBadge').className = "hidden sm:flex text-[10px] md:text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 items-center gap-1.5 font-medium";
-                document.getElementById('syncText').innerText = "Live";
-                mqttClient.subscribe(`yt_pro_sync_${activeIdCode}`);
-            }
-            
             if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
                 Notification.requestPermission();
             }
             
-            saveAndRender();
+            saveLocallyAndRender();
+            pullFromCloud(); // Initial Pull
         }
 
-        // 7. 100% PERFECT YOUTUBE EXTRACTOR & EMBED
+        // 7. YOUTUBE EXTRACTOR & EMBED
         function getYouTubeId(url) {
             if (!url) return null;
             const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/gi;
             const match = regex.exec(url);
-            return match ? match[1] : null;
+            return match ? match : null;
         }
 
         function buildEmbedCode(videoId) {
@@ -490,7 +485,7 @@
             `;
         }
 
-        // 9. ADD TO SCHEDULE ACTION
+        // 9. FORM SUBMISSION
         function handleFormSubmit(event) {
             event.preventDefault();
             if(!activeIdCode) return alert("Please Login with an ID first!");
@@ -505,7 +500,8 @@
             const newVideoObj = { id: 'vid_' + Date.now(), title, channel, link, status: 'Pending', schedule_time: '' };
 
             allVideosGlobal.unshift(newVideoObj);
-            publishData();
+            saveLocallyAndRender();
+            pushToCloud();
 
             event.target.reset();
             const previewBox = document.getElementById('formVideoPreview');
@@ -513,11 +509,11 @@
             previewBox.innerHTML = '';
         }
 
-        // 10. UPDATE, SCHEDULE & DELETE
+        // 10. UPDATE & DELETE
         function openScheduleModal(id) {
             targetVideoIdForSchedule = id;
             const now = new Date();
-            document.getElementById('scheduleDate').value = now.toISOString().split('T')[0];
+            document.getElementById('scheduleDate').value = now.toISOString().split('T');
             document.getElementById('scheduleTime').value = now.toTimeString().slice(0,5);
             document.getElementById('scheduleModal').classList.remove('hidden');
         }
@@ -544,12 +540,12 @@
             });
 
             closeScheduleModal();
-            publishData();
+            saveLocallyAndRender();
+            pushToCloud();
         }
 
         function updateStatus(id, currentStatus) {
             let nextStatus = 'Pending';
-
             if (currentStatus === 'Pending') nextStatus = 'SEO In Progress';
             else if (currentStatus === 'Scheduled') nextStatus = 'Public';
             else nextStatus = 'Pending';
@@ -561,7 +557,8 @@
                 }
                 return v;
             });
-            publishData();
+            saveLocallyAndRender();
+            pushToCloud();
         }
 
         function showDeletePrompt(id) {
@@ -572,7 +569,8 @@
         function confirmDelete(id, confirm) {
             if(confirm) {
                 allVideosGlobal = allVideosGlobal.filter(v => v.id !== id);
-                publishData();
+                saveLocallyAndRender();
+                pushToCloud();
             } else {
                 document.getElementById(`del-btn-${id}`).classList.remove('hidden');
                 document.getElementById(`del-box-${id}`).classList.add('hidden');
