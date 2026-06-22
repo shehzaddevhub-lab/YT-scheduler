@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>YT Schedule</title>
-    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -16,21 +17,18 @@
 </head>
 <body class="min-h-screen bg-gray-950 text-gray-100 p-3 md:p-6 select-none relative">
 
-    <!-- 1. SETUP / ID ENTRY MODAL -->
     <div id="idModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
-            <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Connect to Sync ID</h3>
-            <p class="text-xs text-gray-400">Enter a shared ID to sync your dashboard instantly on any device.</p>
+            <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Login with Sync ID</h3>
+            <p class="text-xs text-gray-400">Enter your shared ID to sync your dashboard instantly with Latif bhai.</p>
             <input type="text" id="idCodeInput" placeholder="e.g., tech_master_2026" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white text-center focus:outline-none focus:border-red-500 transition font-mono font-bold">
-            <button onclick="submitIdCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-xs font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Open Dashboard</button>
+            <button onclick="submitIdCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-xs font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Login / Open Dashboard</button>
         </div>
     </div>
 
-    <!-- 2. NATIVE DATE & TIME PICKER MODAL -->
     <div id="scheduleModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full space-y-5 shadow-2xl">
             <h3 class="text-lg font-bold text-teal-400 flex items-center gap-2"><span>📅</span> Set Date & Time</h3>
-            
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1 font-medium">Select Date</label>
@@ -41,7 +39,6 @@
                     <input type="time" id="scheduleTime" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-teal-500 transition cursor-pointer">
                 </div>
             </div>
-
             <div class="flex items-center gap-3 pt-2">
                 <button onclick="closeScheduleModal()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 p-2.5 text-xs font-bold rounded-xl transition cursor-pointer border border-gray-700">Cancel</button>
                 <button onclick="saveSchedule()" class="flex-1 bg-teal-600 hover:bg-teal-500 text-white p-2.5 text-xs font-bold rounded-xl transition cursor-pointer shadow-lg shadow-teal-900/50">Save Schedule</button>
@@ -49,31 +46,39 @@
         </div>
     </div>
 
-    <!-- Header Section -->
     <header class="max-w-7xl mx-auto flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
         <div class="flex items-center gap-2">
             <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
                 <span>📱</span> Install App
             </button>
         </div>
-        <div>
-            <span id="syncBadge" class="text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 flex items-center gap-1.5 font-medium">
-                <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span> 
-                <span id="syncText">Connecting...</span>
-            </span>
+        
+        <div class="relative z-50">
+            <button onclick="toggleProfileMenu()" id="profileBtn" class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium cursor-pointer transition shadow-md">
+                <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span>
+                <span id="profileBtnText" class="truncate max-w-[80px]">Menu</span>
+                <span class="text-lg">👤</span>
+            </button>
+            
+            <div id="profileMenu" class="hidden absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
+                <div class="border-b border-gray-800 pb-3">
+                    <p class="text-[10px] text-gray-500">Active Sync ID:</p>
+                    <p id="dispProfileId" class="text-sm text-green-400 font-mono font-bold truncate">Not Logged In</p>
+                </div>
+                <button onclick="enableNotifications()" class="w-full bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-xs py-2 rounded-xl transition cursor-pointer border border-blue-500/20">🔔 Enable Alerts</button>
+                <button onclick="logoutId()" class="w-full bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs py-2 rounded-xl transition cursor-pointer border border-red-500/20">🚪 Logout ID</button>
+            </div>
         </div>
     </header>
 
-    <!-- Main 3-Section Layout Grid -->
     <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         
-        <!-- SECTION 1: VIDEO ADD -->
         <div class="space-y-6">
             <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl">
                 <h2 class="text-base font-bold mb-4 text-yellow-400 flex items-center gap-2 border-b border-gray-800 pb-2">
                     <span>🎬</span> Add New Video
                 </h2>
-                <form id="videoForm" class="space-y-4" onsubmit="handleFormSubmit(event)">
+                <form id="videoForm" class="space-y-4">
                     <input type="text" id="videoTitle" placeholder="Video Title..." class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500 transition" required />
                     <select id="videoChannel" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none cursor-pointer">
                         <option value="Tech IT Master">Tech IT Master</option>
@@ -86,7 +91,6 @@
             </section>
         </div>
 
-        <!-- SECTION 2: PENDING -->
         <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl lg:min-h-[500px] flex flex-col">
             <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                 <h2 class="text-base font-bold text-orange-400 flex items-center gap-2"><span>⏳</span> Pending</h2>
@@ -104,7 +108,6 @@
             </div>
         </section>
 
-        <!-- SECTION 3: CLEARED -->
         <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl lg:min-h-[500px] flex flex-col">
             <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                 <h2 class="text-base font-bold text-green-400 flex items-center gap-2"><span>✅</span> Cleared</h2>
@@ -123,9 +126,8 @@
         </section>
     </main>
 
-    <!-- PWA, Sync & Badge Engine Script -->
     <script>
-        // 1. PWA INSTALLER (YT SCHEDULE)
+        // 1. PWA & INSTALLER
         const manifestStr = JSON.stringify({
             name: "YT Schedule", short_name: "YT Schedule", display: "standalone",
             background_color: "#030712", theme_color: "#dc2626",
@@ -134,10 +136,6 @@
         const blob = new Blob([manifestStr], {type: 'application/json'});
         document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(blob)}">`);
         
-        // Service Worker setup (Important for App Badges)
-        const swBlob = new Blob(["self.addEventListener('fetch', function() {});"], {type: 'application/javascript'});
-        if ('serviceWorker' in navigator) { navigator.serviceWorker.register(URL.createObjectURL(swBlob)); }
-
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); deferredPrompt = e;
@@ -152,99 +150,62 @@
             }
         });
 
-        // 2. GLOBAL VARIABLES & STATE
-        let activeIdCode = null;
-        let localDataStore = JSON.parse(localStorage.getItem('yt_schedule_db_v3')) || { timestamp: 0, videos: [] };
-        let allVideosGlobal = localDataStore.videos || [];
+        // 2. FIREBASE REALTIME SYNC (THE 100% BULLETPROOF METHOD)
+        const firebaseConfig = { databaseURL: "https://tech-master-live-default-rtdb.firebaseio.com/" };
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const database = firebase.database();
         
+        let activeIdCode = localStorage.getItem('yt_active_id') || null;
+        let dbSyncRef = null;
+        let allVideosGlobal = [];
         let pendingFilter = 'All';
         let clearedFilter = 'All';
         let targetVideoIdForSchedule = null;
+        let isFirstLoad = true;
 
-        // 3. APP BADGING & NOTIFICATION ENGINE
-        function requestNotificationPermission() {
-            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-                Notification.requestPermission();
+        // 3. PROFILE & LOGOUT LOGIC
+        function toggleProfileMenu() {
+            document.getElementById('profileMenu').classList.toggle('hidden');
+        }
+
+        function logoutId() {
+            if(confirm("Are you sure you want to logout?")) {
+                localStorage.removeItem('yt_active_id');
+                window.location.href = window.location.pathname; // Remove URL params and reload
             }
         }
 
+        // 4. NOTIFICATION & BADGING ENGINE
+        function enableNotifications() {
+            if ('Notification' in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') alert("Alerts Enabled! You will be notified of new videos.");
+                    else alert("Please allow notifications in your browser settings.");
+                });
+            } else {
+                alert("Your browser does not support notifications.");
+            }
+            toggleProfileMenu();
+        }
+
         function updateAppIconBadge() {
-            // Pending ویڈیوز کی تعداد گننا
             const allPendingCount = allVideosGlobal.filter(v => v.status === 'Pending' || v.status === 'SEO In Progress').length;
-            
-            // اگر براؤزر / موبائل App Badge API کو سپورٹ کرتا ہے
             if ('setAppBadge' in navigator) {
-                if (allPendingCount > 0) {
-                    navigator.setAppBadge(allPendingCount).catch(err => console.log("Badge error", err));
-                } else {
-                    navigator.clearAppBadge().catch(err => console.log("Clear badge error", err));
-                }
+                if (allPendingCount > 0) navigator.setAppBadge(allPendingCount).catch(err => {});
+                else navigator.clearAppBadge().catch(err => {});
             }
         }
 
         function triggerNewVideoNotification(videoTitle) {
-            if ('Notification' in window && Notification.permission === 'granted') {
+            if ('Notification' in window && Notification.permission === 'granted' && !isFirstLoad) {
                 new Notification("YT Schedule", {
-                    body: `New Video Added: ${videoTitle}`,
+                    body: `New Video: ${videoTitle}`,
                     icon: "https://img.icons8.com/fluency/512/video-playlist.png"
                 });
             }
         }
-
-        // 4. HTTP POLLING ENGINE (100% UNBLOCKABLE SYNC)
-        async function pushToCloud() {
-            if(!activeIdCode) return;
-            
-            localDataStore.videos = allVideosGlobal;
-            localDataStore.timestamp = Date.now();
-            localStorage.setItem('yt_schedule_db_v3', JSON.stringify(localDataStore));
-            updateAppIconBadge(); // اپنا بیج بھی اپڈیٹ کریں
-
-            try {
-                await fetch(`https://dweet.io/dweet/for/yt_sched_room_${activeIdCode}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(localDataStore)
-                });
-            } catch (e) {
-                console.log("Cloud push delayed. Saved locally.");
-            }
-        }
-
-        async function pullFromCloud() {
-            if(!activeIdCode) return;
-
-            try {
-                const res = await fetch(`https://dweet.io/get/latest/dweet/for/yt_sched_room_${activeIdCode}`);
-                const json = await res.json();
-                
-                if (json && json.with && json.with.length > 0) {
-                    const cloudData = json.with[0].content;
-                    
-                    if (cloudData.timestamp > localDataStore.timestamp) {
-                        
-                        // نوٹیفکیشن چیکنگ: اگر کلاؤڈ میں ہماری لوکل ویڈیوز سے زیادہ ویڈیوز ہیں
-                        if(cloudData.videos && cloudData.videos.length > allVideosGlobal.length) {
-                            const newestVideo = cloudData.videos[0]; // سب سے اوپر والی نئی ویڈیو
-                            triggerNewVideoNotification(newestVideo.title);
-                        }
-
-                        localDataStore = cloudData;
-                        allVideosGlobal = cloudData.videos || [];
-                        localStorage.setItem('yt_schedule_db_v3', JSON.stringify(localDataStore));
-                        renderVideos();
-                        updateAppIconBadge(); // کلاؤڈ سے نیا ڈیٹا آنے پر بیج لیس/مائنس کریں
-                    } 
-                    else if (localDataStore.timestamp > cloudData.timestamp && allVideosGlobal.length > 0) {
-                        pushToCloud();
-                    }
-                }
-            } catch (e) {
-                // Background running silently
-            }
-        }
-
-        setInterval(pullFromCloud, 4000); // 4 سیکنڈ کی لوپ
 
         // 5. ID CONNECTION LOGIC
         function checkUrlForId() {
@@ -253,13 +214,14 @@
             
             if (idParam) {
                 activeIdCode = idParam.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                setupRoomUI();
-                requestNotificationPermission(); // آٹی ڈی لاگ ان ہوتے ہی پرمیشن مانگے گا
-                pullFromCloud();
-                updateAppIconBadge();
+                localStorage.setItem('yt_active_id', activeIdCode);
+                connectToFirebase();
+            } else if (activeIdCode) {
+                // If ID is in localStorage, update URL and connect
+                window.history.pushState({}, '', "?id=" + activeIdCode);
+                connectToFirebase();
             } else {
                 document.getElementById('idModal').classList.remove('hidden');
-                renderVideos();
             }
         }
 
@@ -268,27 +230,54 @@
             if (!codeInput) return alert("Please enter an ID!");
             
             activeIdCode = codeInput.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            localStorage.setItem('yt_active_id', activeIdCode);
             window.history.pushState({}, '', "?id=" + activeIdCode);
-            document.getElementById('idModal').classList.add('hidden');
-            setupRoomUI();
             
-            requestNotificationPermission();
-
-            if(allVideosGlobal.length > 0) pushToCloud();
-            else pullFromCloud();
+            document.getElementById('idModal').classList.add('hidden');
+            connectToFirebase();
         }
 
-        function setupRoomUI() {
-            document.getElementById('syncBadge').className = "text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 flex items-center gap-1.5 font-medium";
+        function connectToFirebase() {
+            if (!activeIdCode) return;
+            
             document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
-            document.getElementById('syncText').innerText = "ID: " + activeIdCode;
+            document.getElementById('profileBtnText').innerText = activeIdCode;
+            document.getElementById('dispProfileId').innerText = activeIdCode;
+
+            if (dbSyncRef) dbSyncRef.off(); // Remove old listener
+            
+            dbSyncRef = database.ref('yt_schedules/' + activeIdCode);
+            
+            // This is the MAGIC LISTENER - It runs automatically when data changes on ANY device
+            dbSyncRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                let videosArray = [];
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        videosArray.push({ id: key, ...data[key] });
+                    });
+                }
+                
+                // Sort by timestamp (newest first)
+                videosArray.sort((a, b) => b.timestamp - a.timestamp);
+                
+                // Check if new video was added (for notification)
+                if(videosArray.length > allVideosGlobal.length && !isFirstLoad) {
+                    triggerNewVideoNotification(videosArray.title);
+                }
+
+                allVideosGlobal = videosArray;
+                renderVideos();
+                updateAppIconBadge();
+                isFirstLoad = false;
+            });
         }
 
         // 6. YOUTUBE EXTRACTOR
         function getYouTubeId(url) {
             if (!url) return null;
             let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
-            return (match && match[1]) ? match[1] : null;
+            return (match && match) ? match : null;
         }
 
         function previewVideo(url) {
@@ -341,13 +330,13 @@
             const clearList = document.getElementById('clearList');
 
             if (filteredPending.length === 0) {
-                pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos found.</div>`;
+                pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos.</div>`;
             } else {
                 pendingList.innerHTML = filteredPending.map(video => createCardHTML(video)).join('');
             }
 
             if (filteredCleared.length === 0) {
-                clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos found.</div>`;
+                clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos.</div>`;
             } else {
                 clearList.innerHTML = filteredCleared.map(video => createCardHTML(video)).join('');
             }
@@ -403,9 +392,9 @@
         }
 
         // 8. CORE ACTIONS (FORM SUBMIT)
-        function handleFormSubmit(event) {
-            event.preventDefault();
-            if(!activeIdCode) return alert("Please enter an ID first!");
+        document.getElementById('videoForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if(!activeIdCode || !dbSyncRef) return alert("Please Login with an ID first!");
 
             const title = document.getElementById('videoTitle').value.trim();
             const channel = document.getElementById('videoChannel').value;
@@ -413,23 +402,30 @@
             
             if (!title || !link) return;
 
-            const newVideoObj = { id: 'vid_' + Date.now(), title, channel, link, status: 'Pending', schedule_time: '' };
+            const newId = 'vid_' + Date.now();
+            const newVideoObj = { 
+                title: title, 
+                channel: channel, 
+                link: link, 
+                status: 'Pending', 
+                schedule_time: '',
+                timestamp: Date.now()
+            };
 
-            allVideosGlobal.unshift(newVideoObj);
-            renderVideos();
-            pushToCloud(); 
-
-            document.getElementById('videoForm').reset();
-            const previewBox = document.getElementById('formVideoPreview');
-            previewBox.classList.add('hidden');
-            previewBox.innerHTML = '';
-        }
+            // Firebase automatically syncs and triggers on('value') for all connected devices
+            dbSyncRef.child(newId).set(newVideoObj).then(() => {
+                document.getElementById('videoForm').reset();
+                const previewBox = document.getElementById('formVideoPreview');
+                previewBox.classList.add('hidden');
+                previewBox.innerHTML = '';
+            }).catch(err => alert("Sync Failed. Please check your internet."));
+        });
 
         // 9. DATE & TIME MODAL LOGIC
         function openScheduleModal(id) {
             targetVideoIdForSchedule = id;
             const now = new Date();
-            document.getElementById('scheduleDate').value = now.toISOString().split('T')[0];
+            document.getElementById('scheduleDate').value = now.toISOString().split('T');
             document.getElementById('scheduleTime').value = now.toTimeString().slice(0,5);
             document.getElementById('scheduleModal').classList.remove('hidden');
         }
@@ -447,34 +443,29 @@
 
             const combinedDateTime = `${dateVal}T${timeVal}`;
 
-            allVideosGlobal = allVideosGlobal.map(v => {
-                if(v.id === targetVideoIdForSchedule) {
-                    v.status = 'Scheduled';
-                    v.schedule_time = combinedDateTime;
-                }
-                return v;
-            });
-
+            if(activeIdCode && dbSyncRef) {
+                dbSyncRef.child(targetVideoIdForSchedule).update({
+                    status: 'Scheduled',
+                    schedule_time: combinedDateTime
+                });
+            }
             closeScheduleModal();
-            renderVideos();
-            pushToCloud();
         }
 
         function updateStatus(id, currentStatus) {
+            if(!activeIdCode || !dbSyncRef) return;
+            
             let nextStatus = 'Pending';
+            let updates = {};
+
             if (currentStatus === 'Pending') nextStatus = 'SEO In Progress';
             else if (currentStatus === 'Scheduled') nextStatus = 'Public';
             else nextStatus = 'Pending';
 
-            allVideosGlobal = allVideosGlobal.map(v => {
-                if(v.id === id) {
-                    v.status = nextStatus;
-                    if(nextStatus === 'Pending') v.schedule_time = '';
-                }
-                return v;
-            });
-            renderVideos();
-            pushToCloud();
+            updates.status = nextStatus;
+            if(nextStatus === 'Pending') updates.schedule_time = '';
+
+            dbSyncRef.child(id).update(updates);
         }
 
         function showDeletePrompt(id) {
@@ -483,10 +474,8 @@
         }
 
         function confirmDelete(id, confirm) {
-            if(confirm) {
-                allVideosGlobal = allVideosGlobal.filter(v => v.id !== id);
-                renderVideos();
-                pushToCloud();
+            if(confirm && activeIdCode && dbSyncRef) {
+                dbSyncRef.child(id).remove();
             } else {
                 document.getElementById(`del-btn-${id}`).classList.remove('hidden');
                 document.getElementById(`del-box-${id}`).classList.add('hidden');
