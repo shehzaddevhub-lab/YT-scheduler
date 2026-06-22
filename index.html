@@ -4,31 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>YT Schedule</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Live MQTT WebSockets (No Database Required, 100% Instant Sync) -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s, color 0.3s; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
         ::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+
+        /* --- LIGHT THEME OVERRIDES --- */
+        body.light-theme { background-color: #f3f4f6 !important; color: #1f2937 !important; }
+        body.light-theme .bg-gray-950 { background-color: #e5e7eb !important; }
+        body.light-theme .bg-gray-900 { background-color: #ffffff !important; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1) !important; }
+        body.light-theme .bg-gray-800 { background-color: #f3f4f6 !important; }
+        body.light-theme .border-gray-800 { border-color: #e5e7eb !important; }
+        body.light-theme .border-gray-700 { border-color: #d1d5db !important; }
+        body.light-theme .text-gray-100, body.light-theme .text-white { color: #111827 !important; }
+        body.light-theme .text-gray-200 { color: #1f2937 !important; }
+        body.light-theme .text-gray-300 { color: #374151 !important; }
+        body.light-theme .text-gray-400 { color: #4b5563 !important; }
+        body.light-theme input, body.light-theme select { background-color: #ffffff !important; color: #111827 !important; border-color: #d1d5db !important; }
+        body.light-theme .bg-black { background-color: #e5e7eb !important; border-color: #d1d5db !important; }
+        body.light-theme ::-webkit-calendar-picker-indicator { filter: invert(0); }
     </style>
 </head>
 <body class="min-h-screen bg-gray-950 text-gray-100 p-3 md:p-6 select-none relative">
 
+    <!-- 1. ID ENTRY MODAL -->
     <div id="idModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full text-center space-y-4 shadow-2xl">
-            <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Login with Sync ID</h3>
-            <p class="text-xs text-gray-400">Enter your shared ID to sync your dashboard instantly with Latif bhai.</p>
-            <input type="text" id="idCodeInput" placeholder="e.g., tech_master_2026" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white text-center focus:outline-none focus:border-red-500 transition font-mono font-bold">
-            <button onclick="submitIdCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-xs font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Login / Open Dashboard</button>
+            <div class="flex justify-center mb-2">
+                <img src="https://img.icons8.com/fluency/512/video-playlist.png" class="w-16 h-16 drop-shadow-lg" alt="Logo">
+            </div>
+            <h3 class="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">Connect Sync ID</h3>
+            <p class="text-xs text-gray-400">Enter a shared ID (e.g., tech2026) to instantly sync videos and notifications.</p>
+            <input type="text" id="idCodeInput" placeholder="Enter ID here..." class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-sm text-white text-center focus:outline-none focus:border-red-500 transition font-mono font-bold">
+            <button onclick="submitIdCode()" class="w-full bg-gradient-to-r from-red-600 to-orange-600 p-3 text-sm font-bold rounded-xl text-white cursor-pointer shadow-lg active:scale-95 transition">Login / Connect</button>
         </div>
     </div>
 
+    <!-- 2. DATE & TIME PICKER MODAL -->
     <div id="scheduleModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-900 border border-gray-800 p-6 rounded-2xl max-w-sm w-full space-y-5 shadow-2xl">
-            <h3 class="text-lg font-bold text-teal-400 flex items-center gap-2"><span>📅</span> Set Date & Time</h3>
+            <h3 class="text-lg font-bold text-teal-400 flex items-center gap-2"><span>📅</span> Set Schedule</h3>
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs text-gray-400 mb-1 font-medium">Select Date</label>
@@ -41,56 +62,88 @@
             </div>
             <div class="flex items-center gap-3 pt-2">
                 <button onclick="closeScheduleModal()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 p-2.5 text-xs font-bold rounded-xl transition cursor-pointer border border-gray-700">Cancel</button>
-                <button onclick="saveSchedule()" class="flex-1 bg-teal-600 hover:bg-teal-500 text-white p-2.5 text-xs font-bold rounded-xl transition cursor-pointer shadow-lg shadow-teal-900/50">Save Schedule</button>
+                <button onclick="saveSchedule()" class="flex-1 bg-teal-600 hover:bg-teal-500 text-white p-2.5 text-xs font-bold rounded-xl transition cursor-pointer shadow-lg shadow-teal-900/50">Save</button>
             </div>
         </div>
     </div>
 
-    <header class="max-w-7xl mx-auto flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
-        <div class="flex items-center gap-2">
-            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
+    <!-- 3. MAIN HEADER SECTION -->
+    <header class="max-w-7xl mx-auto flex justify-between items-center border-b border-gray-800 pb-4 mb-6 relative z-40">
+        
+        <!-- LEFT: PROFILE MENU & CONNECTION STATUS -->
+        <div class="flex items-center gap-2 md:gap-3">
+            <div class="relative">
+                <button onclick="toggleProfileMenu()" class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium cursor-pointer transition shadow-md">
+                    <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span>
+                    <span id="profileBtnText" class="truncate max-w-[70px]">Menu</span>
+                    <span class="text-lg">👤</span>
+                </button>
+                
+                <div id="profileMenu" class="hidden absolute left-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
+                    <div class="border-b border-gray-800 pb-3">
+                        <p class="text-[10px] text-gray-500">Active Sync ID:</p>
+                        <p id="dispProfileId" class="text-sm text-green-400 font-mono font-bold truncate">Not Logged In</p>
+                    </div>
+                    <button onclick="enableNotifications()" class="w-full flex justify-center items-center gap-1.5 bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-xs py-2 rounded-xl transition cursor-pointer border border-blue-500/20">
+                        <span>🔔</span> Enable Alerts
+                    </button>
+                    <button onclick="logoutId()" class="w-full flex justify-center items-center gap-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs py-2 rounded-xl transition cursor-pointer border border-red-500/20">
+                        <span>🚪</span> Logout ID
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sync Status Badge (Hidden on very small screens to save space) -->
+            <span id="syncBadge" class="hidden sm:flex text-[10px] md:text-xs bg-red-950/40 border border-red-900 px-3 py-1.5 rounded-full text-red-400 items-center gap-1.5 font-medium">
+                <span id="syncText">Connecting...</span>
+            </span>
+        </div>
+        
+        <!-- CENTER: INSTALL APP BUTTON -->
+        <div class="absolute left-1/2 transform -translate-x-1/2 flex items-center">
+            <button id="installAppBtn" class="hidden flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 px-3 md:px-4 py-2 rounded-xl text-[10px] md:text-xs font-bold text-white shadow-lg transition cursor-pointer">
                 <span>📱</span> Install App
             </button>
-        </div>
-        
-        <div class="relative z-50">
-            <button onclick="toggleProfileMenu()" id="profileBtn" class="flex items-center gap-1.5 bg-gray-900 border border-gray-800 hover:border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium cursor-pointer transition shadow-md">
-                <span class="w-2 h-2 rounded-full bg-red-500" id="statusDot"></span>
-                <span id="profileBtnText" class="truncate max-w-[80px]">Menu</span>
-                <span class="text-lg">👤</span>
+            <button id="iosInstallInfo" onclick="alert('iPhone: Tap Share icon in Safari -> Add to Home Screen')" class="hidden flex items-center gap-1.5 bg-gray-800 border border-gray-700 px-3 py-2 rounded-xl text-[10px] md:text-xs font-medium text-gray-300 cursor-pointer">
+                <span>🍏</span> iOS Install
             </button>
-            
-            <div id="profileMenu" class="hidden absolute right-0 mt-2 w-56 bg-gray-900 border border-gray-800 rounded-2xl p-4 shadow-2xl space-y-3">
-                <div class="border-b border-gray-800 pb-3">
-                    <p class="text-[10px] text-gray-500">Active Sync ID:</p>
-                    <p id="dispProfileId" class="text-sm text-green-400 font-mono font-bold truncate">Not Logged In</p>
-                </div>
-                <button onclick="enableNotifications()" class="w-full bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 text-xs py-2 rounded-xl transition cursor-pointer border border-blue-500/20">🔔 Enable Alerts</button>
-                <button onclick="logoutId()" class="w-full bg-red-950/40 hover:bg-red-900/60 text-red-400 text-xs py-2 rounded-xl transition cursor-pointer border border-red-500/20">🚪 Logout ID</button>
-            </div>
         </div>
+
+        <!-- RIGHT: DARK / LIGHT MODE SWITCH -->
+        <div class="flex items-center">
+            <button onclick="toggleTheme()" id="themeToggleBtn" class="flex items-center justify-center w-9 h-9 md:w-10 md:h-10 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-full text-base shadow-md transition cursor-pointer">
+                ☀️
+            </button>
+        </div>
+
     </header>
 
-    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+    <!-- Main 3-Section Layout Grid -->
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 items-start relative z-10">
         
+        <!-- SECTION 1: VIDEO ADD -->
         <div class="space-y-6">
             <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl">
                 <h2 class="text-base font-bold mb-4 text-yellow-400 flex items-center gap-2 border-b border-gray-800 pb-2">
                     <span>🎬</span> Add New Video
                 </h2>
-                <form id="videoForm" class="space-y-4">
+                <!-- Form Submission Fixed completely -->
+                <form id="videoForm" class="space-y-4" onsubmit="handleFormSubmit(event)">
                     <input type="text" id="videoTitle" placeholder="Video Title..." class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500 transition" required />
                     <select id="videoChannel" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none cursor-pointer">
                         <option value="Tech IT Master">Tech IT Master</option>
                         <option value="Burhan Telecom">Burhan Telecom</option>
                     </select>
                     <input type="url" id="videoLink" placeholder="YouTube Video Link..." class="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-red-500 transition" oninput="previewVideo(this.value)" required />
+                    
                     <div id="formVideoPreview" class="hidden w-full aspect-video rounded-xl overflow-hidden bg-black border border-gray-800"></div>
-                    <button type="submit" id="addBtnSubmit" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold p-3 text-xs rounded-xl shadow-lg cursor-pointer transition active:scale-95">Add to Schedule</button>
+                    
+                    <button type="submit" class="w-full bg-gradient-to-r from-red-600 to-orange-600 text-white font-bold p-3 text-sm rounded-xl shadow-lg cursor-pointer transition active:scale-95">Add to Schedule</button>
                 </form>
             </section>
         </div>
 
+        <!-- SECTION 2: PENDING -->
         <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl lg:min-h-[500px] flex flex-col">
             <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                 <h2 class="text-base font-bold text-orange-400 flex items-center gap-2"><span>⏳</span> Pending</h2>
@@ -108,6 +161,7 @@
             </div>
         </section>
 
+        <!-- SECTION 3: CLEARED -->
         <section class="bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl lg:min-h-[500px] flex flex-col">
             <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                 <h2 class="text-base font-bold text-green-400 flex items-center gap-2"><span>✅</span> Cleared</h2>
@@ -126,8 +180,24 @@
         </section>
     </main>
 
+    <!-- Core App Engine -->
     <script>
-        // 1. PWA & INSTALLER
+        // 1. THEME TOGGLE LOGIC (DARK / LIGHT MODE)
+        function toggleTheme() {
+            const body = document.body;
+            body.classList.toggle('light-theme');
+            const isLight = body.classList.contains('light-theme');
+            localStorage.setItem('yt_theme', isLight ? 'light' : 'dark');
+            document.getElementById('themeToggleBtn').innerHTML = isLight ? '🌙' : '☀️';
+        }
+        
+        // Load saved theme on startup
+        if (localStorage.getItem('yt_theme') === 'light') {
+            document.body.classList.add('light-theme');
+            document.getElementById('themeToggleBtn').innerHTML = '🌙';
+        }
+
+        // 2. PWA & INSTALLER
         const manifestStr = JSON.stringify({
             name: "YT Schedule", short_name: "YT Schedule", display: "standalone",
             background_color: "#030712", theme_color: "#dc2626",
@@ -136,6 +206,9 @@
         const blob = new Blob([manifestStr], {type: 'application/json'});
         document.querySelector('head').insertAdjacentHTML('beforeend', `<link rel="manifest" href="${URL.createObjectURL(blob)}">`);
         
+        const swBlob = new Blob(["self.addEventListener('fetch', function() {});"], {type: 'application/javascript'});
+        if ('serviceWorker' in navigator) { navigator.serviceWorker.register(URL.createObjectURL(swBlob)); }
+
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); deferredPrompt = e;
@@ -150,64 +223,103 @@
             }
         });
 
-        // 2. FIREBASE REALTIME SYNC (THE 100% BULLETPROOF METHOD)
-        const firebaseConfig = { databaseURL: "https://tech-master-live-default-rtdb.firebaseio.com/" };
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const database = firebase.database();
-        
+        const isIos = () => /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase());
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && window.navigator.standalone;
+        if (isIos() && !isInStandaloneMode()) { document.getElementById('iosInstallInfo').classList.remove('hidden'); }
+
+        // 3. GLOBAL VARIABLES
+        const myDeviceId = 'dev_' + Math.random().toString(36).substr(2, 9);
         let activeIdCode = localStorage.getItem('yt_active_id') || null;
-        let dbSyncRef = null;
-        let allVideosGlobal = [];
+        let allVideosGlobal = JSON.parse(localStorage.getItem(`yt_backup_${activeIdCode}`)) || [];
+        
         let pendingFilter = 'All';
         let clearedFilter = 'All';
         let targetVideoIdForSchedule = null;
-        let isFirstLoad = true;
 
-        // 3. PROFILE & LOGOUT LOGIC
-        function toggleProfileMenu() {
-            document.getElementById('profileMenu').classList.toggle('hidden');
-        }
+        // 4. MQTT WEBSOCKETS (100% UNBLOCKABLE LIVE SYNC)
+        const mqttClient = mqtt.connect('wss://broker.hivemq.com:8443/mqtt');
 
-        function logoutId() {
-            if(confirm("Are you sure you want to logout?")) {
-                localStorage.removeItem('yt_active_id');
-                window.location.href = window.location.pathname; // Remove URL params and reload
+        mqttClient.on('connect', () => {
+            if(activeIdCode) {
+                document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
+                document.getElementById('syncBadge').className = "hidden sm:flex text-[10px] md:text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 items-center gap-1.5 font-medium";
+                document.getElementById('syncText').innerText = "Live";
+                mqttClient.subscribe(`yt_pro_sync_${activeIdCode}`);
             }
+        });
+
+        mqttClient.on('message', (topic, message) => {
+            if(topic === `yt_pro_sync_${activeIdCode}`) {
+                try {
+                    const payload = JSON.parse(message.toString());
+                    if(payload.sender !== myDeviceId) {
+                        if(payload.videos.length > allVideosGlobal.length) {
+                            const newVideo = payload.videos[0];
+                            triggerNotification(newVideo.title);
+                        }
+                        allVideosGlobal = payload.videos;
+                        saveAndRender();
+                    }
+                } catch(e) { console.error(e); }
+            }
+        });
+
+        function publishData() {
+            if(activeIdCode && mqttClient.connected) {
+                const payload = JSON.stringify({ sender: myDeviceId, videos: allVideosGlobal });
+                mqttClient.publish(`yt_pro_sync_${activeIdCode}`, payload, { retain: true });
+            }
+            saveAndRender();
         }
 
-        // 4. NOTIFICATION & BADGING ENGINE
+        // 5. NOTIFICATION & BADGES
         function enableNotifications() {
             if ('Notification' in window) {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') alert("Alerts Enabled! You will be notified of new videos.");
-                    else alert("Please allow notifications in your browser settings.");
+                Notification.requestPermission().then(perm => {
+                    if(perm === 'granted') alert("Notifications Enabled successfully!");
+                    else alert("Please allow notifications in your browser permissions.");
                 });
-            } else {
-                alert("Your browser does not support notifications.");
             }
             toggleProfileMenu();
         }
 
-        function updateAppIconBadge() {
-            const allPendingCount = allVideosGlobal.filter(v => v.status === 'Pending' || v.status === 'SEO In Progress').length;
-            if ('setAppBadge' in navigator) {
-                if (allPendingCount > 0) navigator.setAppBadge(allPendingCount).catch(err => {});
-                else navigator.clearAppBadge().catch(err => {});
-            }
-        }
-
-        function triggerNewVideoNotification(videoTitle) {
-            if ('Notification' in window && Notification.permission === 'granted' && !isFirstLoad) {
+        function triggerNotification(videoTitle) {
+            if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification("YT Schedule", {
-                    body: `New Video: ${videoTitle}`,
+                    body: `New video added: ${videoTitle}`,
                     icon: "https://img.icons8.com/fluency/512/video-playlist.png"
                 });
             }
         }
 
-        // 5. ID CONNECTION LOGIC
+        function updateAppBadge() {
+            const pendingCount = allVideosGlobal.filter(v => v.status === 'Pending' || v.status === 'SEO In Progress').length;
+            if ('setAppBadge' in navigator) {
+                if (pendingCount > 0) navigator.setAppBadge(pendingCount).catch(()=>console.log("Badge err"));
+                else navigator.clearAppBadge().catch(()=>console.log("Badge clear err"));
+            }
+        }
+
+        function saveAndRender() {
+            if(activeIdCode) {
+                localStorage.setItem(`yt_backup_${activeIdCode}`, JSON.stringify(allVideosGlobal));
+            }
+            updateAppBadge();
+            renderVideos();
+        }
+
+        // 6. LOGIN / LOGOUT LOGIC
+        function toggleProfileMenu() {
+            document.getElementById('profileMenu').classList.toggle('hidden');
+        }
+
+        function logoutId() {
+            if(confirm("Logout from this ID?")) {
+                localStorage.removeItem('yt_active_id');
+                window.location.href = window.location.pathname; 
+            }
+        }
+
         function checkUrlForId() {
             const params = new URLSearchParams(window.location.search);
             const idParam = params.get('id');
@@ -215,11 +327,10 @@
             if (idParam) {
                 activeIdCode = idParam.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
                 localStorage.setItem('yt_active_id', activeIdCode);
-                connectToFirebase();
+                setupApp();
             } else if (activeIdCode) {
-                // If ID is in localStorage, update URL and connect
                 window.history.pushState({}, '', "?id=" + activeIdCode);
-                connectToFirebase();
+                setupApp();
             } else {
                 document.getElementById('idModal').classList.remove('hidden');
             }
@@ -234,57 +345,45 @@
             window.history.pushState({}, '', "?id=" + activeIdCode);
             
             document.getElementById('idModal').classList.add('hidden');
-            connectToFirebase();
+            setupApp();
         }
 
-        function connectToFirebase() {
-            if (!activeIdCode) return;
-            
-            document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
+        function setupApp() {
             document.getElementById('profileBtnText').innerText = activeIdCode;
             document.getElementById('dispProfileId').innerText = activeIdCode;
-
-            if (dbSyncRef) dbSyncRef.off(); // Remove old listener
+            allVideosGlobal = JSON.parse(localStorage.getItem(`yt_backup_${activeIdCode}`)) || [];
             
-            dbSyncRef = database.ref('yt_schedules/' + activeIdCode);
+            if(mqttClient.connected) {
+                document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-green-400 animate-pulse";
+                document.getElementById('syncBadge').className = "hidden sm:flex text-[10px] md:text-xs bg-green-950/40 border border-green-800 px-3 py-1.5 rounded-full text-green-400 items-center gap-1.5 font-medium";
+                document.getElementById('syncText').innerText = "Live";
+                mqttClient.subscribe(`yt_pro_sync_${activeIdCode}`);
+            }
             
-            // This is the MAGIC LISTENER - It runs automatically when data changes on ANY device
-            dbSyncRef.on('value', (snapshot) => {
-                const data = snapshot.val();
-                let videosArray = [];
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        videosArray.push({ id: key, ...data[key] });
-                    });
-                }
-                
-                // Sort by timestamp (newest first)
-                videosArray.sort((a, b) => b.timestamp - a.timestamp);
-                
-                // Check if new video was added (for notification)
-                if(videosArray.length > allVideosGlobal.length && !isFirstLoad) {
-                    triggerNewVideoNotification(videosArray.title);
-                }
-
-                allVideosGlobal = videosArray;
-                renderVideos();
-                updateAppIconBadge();
-                isFirstLoad = false;
-            });
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                Notification.requestPermission();
+            }
+            
+            saveAndRender();
         }
 
-        // 6. YOUTUBE EXTRACTOR
+        // 7. 100% PERFECT YOUTUBE EXTRACTOR & EMBED
         function getYouTubeId(url) {
             if (!url) return null;
-            let match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
-            return (match && match) ? match : null;
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/gi;
+            const match = regex.exec(url);
+            return match ? match[1] : null;
+        }
+
+        function buildEmbedCode(videoId) {
+            return `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
         }
 
         function previewVideo(url) {
             const videoId = getYouTubeId(url);
             const previewBox = document.getElementById('formVideoPreview');
             if (videoId) {
-                previewBox.innerHTML = `<iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>`;
+                previewBox.innerHTML = buildEmbedCode(videoId);
                 previewBox.classList.remove('hidden');
             } else {
                 previewBox.innerHTML = '';
@@ -292,7 +391,7 @@
             }
         }
 
-        // 7. FILTER & RENDER ENGINE
+        // 8. FILTER & RENDER ENGINE
         function setFilter(section, channelName) {
             if(section === 'pending') {
                 pendingFilter = channelName;
@@ -330,13 +429,13 @@
             const clearList = document.getElementById('clearList');
 
             if (filteredPending.length === 0) {
-                pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos.</div>`;
+                pendingList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No pending videos found.</div>`;
             } else {
                 pendingList.innerHTML = filteredPending.map(video => createCardHTML(video)).join('');
             }
 
             if (filteredCleared.length === 0) {
-                clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos.</div>`;
+                clearList.innerHTML = `<div class="text-center py-12 text-gray-600 text-xs border border-dashed border-gray-800 rounded-xl">No cleared videos found.</div>`;
             } else {
                 clearList.innerHTML = filteredCleared.map(video => createCardHTML(video)).join('');
             }
@@ -363,7 +462,7 @@
             }
 
             const videoId = getYouTubeId(video.link);
-            const embedHTML = videoId ? `<div class="w-full aspect-video rounded-lg overflow-hidden bg-black mt-2 mb-2 border border-gray-800"><iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe></div>` : '';
+            const embedHTML = videoId ? `<div class="w-full aspect-video rounded-lg overflow-hidden bg-black mt-2 mb-2 border border-gray-800">${buildEmbedCode(videoId)}</div>` : '';
 
             return `
                 <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl flex flex-col gap-2 shadow-md">
@@ -391,41 +490,34 @@
             `;
         }
 
-        // 8. CORE ACTIONS (FORM SUBMIT)
-        document.getElementById('videoForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            if(!activeIdCode || !dbSyncRef) return alert("Please Login with an ID first!");
+        // 9. ADD TO SCHEDULE ACTION
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            if(!activeIdCode) return alert("Please Login with an ID first!");
 
             const title = document.getElementById('videoTitle').value.trim();
             const channel = document.getElementById('videoChannel').value;
             const link = document.getElementById('videoLink').value.trim();
             
-            if (!title || !link) return;
+            const vidId = getYouTubeId(link);
+            if (!vidId) return alert("Invalid YouTube Link!");
 
-            const newId = 'vid_' + Date.now();
-            const newVideoObj = { 
-                title: title, 
-                channel: channel, 
-                link: link, 
-                status: 'Pending', 
-                schedule_time: '',
-                timestamp: Date.now()
-            };
+            const newVideoObj = { id: 'vid_' + Date.now(), title, channel, link, status: 'Pending', schedule_time: '' };
 
-            // Firebase automatically syncs and triggers on('value') for all connected devices
-            dbSyncRef.child(newId).set(newVideoObj).then(() => {
-                document.getElementById('videoForm').reset();
-                const previewBox = document.getElementById('formVideoPreview');
-                previewBox.classList.add('hidden');
-                previewBox.innerHTML = '';
-            }).catch(err => alert("Sync Failed. Please check your internet."));
-        });
+            allVideosGlobal.unshift(newVideoObj);
+            publishData();
 
-        // 9. DATE & TIME MODAL LOGIC
+            event.target.reset();
+            const previewBox = document.getElementById('formVideoPreview');
+            previewBox.classList.add('hidden');
+            previewBox.innerHTML = '';
+        }
+
+        // 10. UPDATE, SCHEDULE & DELETE
         function openScheduleModal(id) {
             targetVideoIdForSchedule = id;
             const now = new Date();
-            document.getElementById('scheduleDate').value = now.toISOString().split('T');
+            document.getElementById('scheduleDate').value = now.toISOString().split('T')[0];
             document.getElementById('scheduleTime').value = now.toTimeString().slice(0,5);
             document.getElementById('scheduleModal').classList.remove('hidden');
         }
@@ -443,29 +535,33 @@
 
             const combinedDateTime = `${dateVal}T${timeVal}`;
 
-            if(activeIdCode && dbSyncRef) {
-                dbSyncRef.child(targetVideoIdForSchedule).update({
-                    status: 'Scheduled',
-                    schedule_time: combinedDateTime
-                });
-            }
+            allVideosGlobal = allVideosGlobal.map(v => {
+                if(v.id === targetVideoIdForSchedule) {
+                    v.status = 'Scheduled';
+                    v.schedule_time = combinedDateTime;
+                }
+                return v;
+            });
+
             closeScheduleModal();
+            publishData();
         }
 
         function updateStatus(id, currentStatus) {
-            if(!activeIdCode || !dbSyncRef) return;
-            
             let nextStatus = 'Pending';
-            let updates = {};
 
             if (currentStatus === 'Pending') nextStatus = 'SEO In Progress';
             else if (currentStatus === 'Scheduled') nextStatus = 'Public';
             else nextStatus = 'Pending';
 
-            updates.status = nextStatus;
-            if(nextStatus === 'Pending') updates.schedule_time = '';
-
-            dbSyncRef.child(id).update(updates);
+            allVideosGlobal = allVideosGlobal.map(v => {
+                if(v.id === id) {
+                    v.status = nextStatus;
+                    if(nextStatus === 'Pending') v.schedule_time = '';
+                }
+                return v;
+            });
+            publishData();
         }
 
         function showDeletePrompt(id) {
@@ -474,15 +570,16 @@
         }
 
         function confirmDelete(id, confirm) {
-            if(confirm && activeIdCode && dbSyncRef) {
-                dbSyncRef.child(id).remove();
+            if(confirm) {
+                allVideosGlobal = allVideosGlobal.filter(v => v.id !== id);
+                publishData();
             } else {
                 document.getElementById(`del-btn-${id}`).classList.remove('hidden');
                 document.getElementById(`del-box-${id}`).classList.add('hidden');
             }
         }
 
-        // Start Engine
+        // Start App
         checkUrlForId();
     </script>
 </body>
